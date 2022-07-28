@@ -1,7 +1,8 @@
 {
   "yadisk": {
     "token": "",
-    "root_dir": "/Spike/"
+    "root_dir": "/Spike/",
+    "public_url": ""
   },
   "telegram_token": "",
   "workdir": "/tmp/spike",
