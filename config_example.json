@@ -1,0 +1,9 @@
+{
+  "yadisk": {
+    "token": "",
+    "root_dir": "/Spike/"
+  },
+  "telegram_token": "",
+  "workdir": "/tmp/spike",
+  "database": "state.pkl"
+}
