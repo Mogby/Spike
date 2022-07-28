@@ -62,7 +62,7 @@ class Spike:
         )
         dispatcher = self.updater.dispatcher
         dispatcher.add_handler(CommandHandler("map", self.map))
-        dispatcher.add_handler(CommandHandler("save", self.save))
+        dispatcher.add_handler(CommandHandler("save", self.save, filters=Filters.all))
 
     def run(self) -> None:
         self.updater.start_polling()
