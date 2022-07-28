@@ -5,7 +5,7 @@ from os import wait
 from pathlib import Path
 from typing import Any, BinaryIO, Dict, List, Union
 
-from telegram import Update, PhotoSize
+from telegram import Update, Message, PhotoSize
 from telegram.ext import (
     CallbackContext,
     CommandHandler,
@@ -62,51 +62,18 @@ class Spike:
             persistence=PicklePersistence(filename=self.workdir / config["database"]),
         )
         dispatcher = self.updater.dispatcher
-        dispatcher.add_handler(MessageHandler(Filters.all, self.log_message))
-        dispatcher.add_handler(CommandHandler("map", self.map))
-        dispatcher.add_handler(CommandHandler("save", self.save))
+        dispatcher.add_handler(MessageHandler(Filters.all, self._log_message, group=0))
+        dispatcher.add_handler(MessageHandler(Filters.document.photo, self._save_from_photo, group=1))
+        dispatcher.add_handler(CommandHandler("map", self._map, group=1))
+        dispatcher.add_handler(CommandHandler("save", self._save_from_reply, group=1))
 
     def run(self) -> None:
         self.updater.start_polling()
 
-    def log_message(self, update: Update, context: CallbackContext) -> None:
-        logging.info("Got update:")
-        logging.info(update)
-        logging.info("Args:")
-        logging.info(args := context.args)
-
-    def map(self, update: Update, context: CallbackContext) -> None:
-        args = context.args
-
-        if len(args) < 2:
-            update.message.reply_text("Usage: /map TAG DIRECTORY_NAME.")
-            return
-
-        tag = args[0]
-        directory_name = " ".join(args[1:])
-        context.chat_data[tag] = directory_name
-        update.message.reply_text(f"Mapped '{tag}' to '{directory_name}'.")
-
-    def save(self, update: Update, context: CallbackContext) -> None:
-        message = update.message
-        if len(message.photo) > 0:
-            src_message = message
-        elif message.reply_to_message is not None and len(message.reply_to_message.photo) > 0:
-            src_message = message.reply_to_message
-        else:
-            message.reply_text("You must reply to a message with a photo to save it.")
-            return
-
-        args = context.args
-
-        if len(args) != 1:
-            message.reply_text("You must provide exactly one tag.")
-            return
-
-        tag = args[0]
+    def _save_photo_for_tag(self, update: Update, context: CallbackContext, src_message: Message, tag: str) -> None:
         chat_data = context.chat_data
         if tag not in chat_data:
-            message.reply_text(f"Unknown tag: '{tag}'.")
+            src_message.reply_text(f"Unknown tag: '{tag}'.")
             return
 
         category = context.chat_data[tag]
@@ -124,7 +91,7 @@ class Spike:
                 self.disk.save_file(f, yadisk_path)
             except yadisk.exceptions.PathExistsError:
                 logging.error(f"File already exists: '{yadisk_path}'.")
-                message.reply_text(
+                update.message.reply_text(
                     f"Could not save becase file already exists: '{yadisk_path}'."
                 )
                 return
@@ -133,7 +100,59 @@ class Spike:
                 local_path.unlink()
 
         logging.info("Done")
-        message.reply_text(f"Saved to '{yadisk_path}'.")
+        update.message.reply_text(f"Saved to '{yadisk_path}'.")
+
+    def _log_message(self, update: Update, context: CallbackContext) -> None:
+        logging.info("Got update:")
+        logging.info(update)
+        logging.info("Args:")
+        logging.info(args := context.args)
+
+    def _map(self, update: Update, context: CallbackContext) -> None:
+        args = context.args
+
+        if len(args) < 2:
+            update.message.reply_markdown_v2("Usage: `/map TAG DIRECTORY_NAME`.")
+            return
+
+        tag = args[0]
+        directory_name = " ".join(args[1:])
+        context.chat_data[tag] = directory_name
+        update.message.reply_markdown_v2(f"Mapped `{tag}` to `{directory_name}`.")
+
+    def _save_from_photo(self, update: Update, context: CallbackContext) -> None:
+        if update.message.caption is None:
+            return
+
+        parts = update.message.caption.split()
+        if "/save" not in parts:
+            return
+
+        if len(parts) != 2 or parts[0] != "/save":
+            update.message.reply_markdown_v2("Usage: `/save TAG`.")
+            return
+        
+        tag = parts[1]
+        self._save_photo_for_tag(update, context, update.message, tag)
+
+    def _save_from_reply(self, update: Update, context: CallbackContext) -> None:
+        message = update.message
+        if len(message.photo) > 0:
+            src_message = message
+        elif message.reply_to_message is not None and len(message.reply_to_message.photo) > 0:
+            src_message = message.reply_to_message
+        else:
+            message.reply_text("You must reply to a message with a photo to save it.")
+            return
+
+        args = context.args
+
+        if len(args) != 1:
+            message.reply_text("You must provide exactly one tag.")
+            return
+
+        tag = args[0]
+        self._save_photo_for_tag(update, context, src_message, tag)
 
 
 def main():
