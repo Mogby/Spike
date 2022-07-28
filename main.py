@@ -42,7 +42,7 @@ class YaDisk:
         if self.public_url is None:
             return
 
-        return f"{self.public_url}{dst_path}"
+        return f"{self.public_url}/{path}"
 
     def _mkdir_if_not_exists(self, dir: AnyPath) -> None:
         if not self.api.exists(str(dir)):
