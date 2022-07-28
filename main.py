@@ -108,7 +108,7 @@ class Spike:
         if public_url is None:
             update.message.reply_markdown_v2(f"Saved to `{yadisk_path}`")
         else:
-            update.message.reply_markdown_v2(f"[Saved]({public_url})")
+            update.message.reply_markdown_v2(f"[Saved]({public_url})", disable_web_page_preview=True)
 
     def _log_message(self, update: Update, context: CallbackContext) -> None:
         logging.info("Got update:")
