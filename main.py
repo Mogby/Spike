@@ -89,7 +89,11 @@ class Spike:
         logging.info(args := context.args)
 
         message = update.message
-        if message.reply_to_message is None or len(message.reply_to_message.photo) == 0:
+        if len(message.photo) > 0:
+            src_message = message
+        elif message.reply_to_message is not None and len(message.reply_to_message.photo) > 0:
+            src_message = message.reply_to_message
+        else:
             message.reply_text("You must reply to a message with a photo to save it.")
             return
 
@@ -104,9 +108,9 @@ class Spike:
             return
 
         category = context.chat_data[tag]
-        photo = get_largest_size(message.reply_to_message.photo)
+        photo = get_largest_size(src_message.photo)
         filename = (
-            str(update.message.reply_to_message.message_id).zfill(ID_SIZE) + ".jpg"
+            str(src_message.message_id).zfill(ID_SIZE) + ".jpg"
         )
         local_path = self.workdir / filename
         logging.info(f"Downloading to '{local_path}'")
