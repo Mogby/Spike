@@ -1,0 +1,25 @@
+appdirs==1.4.4
+APScheduler==3.6.3
+attrs @ file:///opt/conda/conda-bld/attrs_1642510447205/work
+black==19.10b0
+cachetools==4.2.2
+certifi @ file:///opt/conda/conda-bld/certifi_1655968806487/work/certifi
+charset-normalizer==2.1.0
+click @ file:///tmp/build/80754af9/click_1646056590078/work
+idna==3.3
+mypy-extensions==0.4.3
+pathspec==0.7.0
+python-telegram-bot==13.13
+pytz==2022.1
+pytz-deprecation-shim==0.1.0.post0
+regex @ file:///tmp/abs_41f5bce5-0a2e-45aa-b231-1fd2fbd57753gfpe6sjm/croots/recipe/regex_1658257178822/work
+requests==2.28.1
+six==1.16.0
+toml @ file:///tmp/build/80754af9/toml_1616166611790/work
+tornado==6.2
+typed-ast @ file:///tmp/build/80754af9/typed-ast_1624953673314/work
+typing_extensions @ file:///opt/conda/conda-bld/typing_extensions_1647553014482/work
+tzdata==2022.1
+tzlocal==4.2
+urllib3==1.26.11
+yadisk==1.2.15
