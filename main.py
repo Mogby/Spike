@@ -63,7 +63,7 @@ class Spike:
         )
         dispatcher = self.updater.dispatcher
         dispatcher.add_handler(MessageHandler(Filters.all, self._log_message), group=0)
-        dispatcher.add_handler(MessageHandler(Filters.document.photo, self._save_from_photo), group=1)
+        dispatcher.add_handler(MessageHandler(Filters.photo, self._save_from_photo), group=1)
         dispatcher.add_handler(CommandHandler("map", self._map), group=1)
         dispatcher.add_handler(CommandHandler("save", self._save_from_reply), group=1)
 
