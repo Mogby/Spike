@@ -80,7 +80,7 @@ class Spike:
         tag = args[0]
         directory_name = " ".join(args[1:])
         context.chat_data[tag] = directory_name
-        update.message.reply_text(f"Mapped {tag} to {directory_name}.")
+        update.message.reply_text(f"Mapped '{tag}' to '{directory_name}'.")
 
     def save(self, update: Update, context: CallbackContext) -> None:
         logging.info("Got update:")
@@ -100,7 +100,7 @@ class Spike:
         tag = args[0]
         chat_data = context.chat_data
         if tag not in chat_data:
-            message.reply_text(f"Unknown tag: {tag}.")
+            message.reply_text(f"Unknown tag: '{tag}'.")
             return
 
         category = context.chat_data[tag]
