@@ -1,9 +1,8 @@
 import argparse
 import json
 import logging
-from os import wait
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, List, Union
+from typing import Any, BinaryIO, Dict, List, Optional, Union
 
 from telegram import Update, Message, PhotoSize
 from telegram.ext import (
