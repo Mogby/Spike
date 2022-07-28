@@ -62,7 +62,7 @@ class Spike:
             persistence=PicklePersistence(filename=self.workdir / config["database"]),
         )
         dispatcher = self.updater.dispatcher
-        dispatcher.add_handler(MessageHandler(filters=Filters.all, self.log_message))
+        dispatcher.add_handler(MessageHandler(Filters.all, self.log_message))
         dispatcher.add_handler(CommandHandler("map", self.map))
         dispatcher.add_handler(CommandHandler("save", self.save))
 
