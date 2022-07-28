@@ -76,6 +76,8 @@ class Spike:
         logging.info(args := context.args)
 
     def map(self, update: Update, context: CallbackContext) -> None:
+        args = context.args
+
         if len(args) < 2:
             update.message.reply_text("Usage: /map TAG DIRECTORY_NAME.")
             return
@@ -94,6 +96,8 @@ class Spike:
         else:
             message.reply_text("You must reply to a message with a photo to save it.")
             return
+
+        args = context.args
 
         if len(args) != 1:
             message.reply_text("You must provide exactly one tag.")
