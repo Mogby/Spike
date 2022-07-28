@@ -10,6 +10,7 @@ from telegram.ext import (
     CallbackContext,
     CommandHandler,
     Filters,
+    MessageHandler,
     PicklePersistence,
     Updater,
 )
@@ -61,18 +62,20 @@ class Spike:
             persistence=PicklePersistence(filename=self.workdir / config["database"]),
         )
         dispatcher = self.updater.dispatcher
+        dispatcher.add_handler(MessageHandler(filters=Filters.all, self.log_message))
         dispatcher.add_handler(CommandHandler("map", self.map))
-        dispatcher.add_handler(CommandHandler("save", self.save, filters=Filters.all))
+        dispatcher.add_handler(CommandHandler("save", self.save))
 
     def run(self) -> None:
         self.updater.start_polling()
 
-    def map(self, update: Update, context: CallbackContext) -> None:
+    def log_message(self, update: Update, context: CallbackContext) -> None:
         logging.info("Got update:")
         logging.info(update)
         logging.info("Args:")
         logging.info(args := context.args)
 
+    def map(self, update: Update, context: CallbackContext) -> None:
         if len(args) < 2:
             update.message.reply_text("Usage: /map TAG DIRECTORY_NAME.")
             return
@@ -83,11 +86,6 @@ class Spike:
         update.message.reply_text(f"Mapped '{tag}' to '{directory_name}'.")
 
     def save(self, update: Update, context: CallbackContext) -> None:
-        logging.info("Got update:")
-        logging.info(update)
-        logging.info("Args:")
-        logging.info(args := context.args)
-
         message = update.message
         if len(message.photo) > 0:
             src_message = message
