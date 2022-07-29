@@ -1,10 +1,34 @@
 {
-  "yadisk": {
-    "token": "",
-    "root_dir": "/Spike/",
-    "public_url": ""
+  "logging": {
+    "comment": "ah s%$!, here we go again",
+    "formatters": {
+      "standard": {
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+      }
+    },
+    "handlers": {
+      "console": { 
+        "class": "logging.StreamHandler",
+        "formatter": "standard",
+        "level": "INFO",
+        "stream": "ext://sys.stdout"
+      },
+      "file": {
+        "class": "logging.handlers.FileHandler",
+        "formatter": "standard",
+        "level": "INFO",
+        "stream": "/tmp/spike/log"
+      }
+    }
   },
-  "telegram_token": "",
-  "workdir": "/tmp/spike",
-  "database": "state.pkl"
+  "spike": {
+    "yadisk": {
+      "token": "",
+      "root_dir": "/Spike/",
+      "public_url": ""
+    },
+    "telegram_token": "",
+    "workdir": "/tmp/spike",
+    "database": "state.pkl"
+  }
 }
