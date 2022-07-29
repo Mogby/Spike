@@ -1,9 +1,8 @@
 import argparse
 import json
 import logging
-from os import wait
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, List, Union
+from typing import Any, BinaryIO, Dict, List, Optional, Union
 
 from telegram import Update, Message, PhotoSize
 from telegram.ext import (
@@ -32,12 +31,18 @@ class YaDisk:
     def __init__(self, config: Dict[Any, Any]) -> None:
         self.api = yadisk.YaDisk(token=config["token"])
         self.root_dir = Path(config["root_dir"])
+        self.public_url = config.get("public_url")
 
-    def save_file(self, file: BinaryIO, path: str) -> None:
+    def save_file(self, file: BinaryIO, path: str) -> Optional[str]:
         dst_path = self.root_dir / path
         self._mkdir_if_not_exists(dst_path.parent)
         logging.info(f"Uploading to '{path}'")
         self.api.upload(path_or_file=file, dst_path=dst_path)
+
+        if self.public_url is None:
+            return
+
+        return f"{self.public_url}/{path}"
 
     def _mkdir_if_not_exists(self, dir: AnyPath) -> None:
         if not self.api.exists(str(dir)):
@@ -73,7 +78,7 @@ class Spike:
     def _save_photo_for_tag(self, update: Update, context: CallbackContext, src_message: Message, tag: str) -> None:
         chat_data = context.chat_data
         if tag not in chat_data:
-            src_message.reply_text(f"Unknown tag: '{tag}'.")
+            src_message.reply_markdown_v2(f"Unknown tag: `{tag}`")
             return
 
         category = context.chat_data[tag]
@@ -88,11 +93,11 @@ class Spike:
 
         with local_path.open("rb") as f:
             try:
-                self.disk.save_file(f, yadisk_path)
+                public_url = self.disk.save_file(f, yadisk_path)
             except yadisk.exceptions.PathExistsError:
-                logging.error(f"File already exists: '{yadisk_path}'.")
-                update.message.reply_text(
-                    f"Could not save becase file already exists: '{yadisk_path}'."
+                logging.error(f"File already exists: '{yadisk_path}'")
+                update.message.reply_markdown_v2(
+                    f"Could not save becase file already exists: `{yadisk_path}`"
                 )
                 return
             finally:
@@ -100,7 +105,10 @@ class Spike:
                 local_path.unlink()
 
         logging.info("Done")
-        update.message.reply_text(f"Saved to '{yadisk_path}'.")
+        if public_url is None:
+            update.message.reply_markdown_v2(f"Saved to `{yadisk_path}`")
+        else:
+            update.message.reply_markdown_v2(f"[Saved]({public_url})", disable_web_page_preview=True)
 
     def _log_message(self, update: Update, context: CallbackContext) -> None:
         logging.info("Got update:")
@@ -112,13 +120,13 @@ class Spike:
         args = context.args
 
         if len(args) < 2:
-            update.message.reply_markdown_v2("Usage: `/map TAG DIRECTORY_NAME`.")
+            update.message.reply_markdown_v2("Usage: `/map TAG DIRECTORY_NAME`")
             return
 
         tag = args[0]
         directory_name = " ".join(args[1:])
         context.chat_data[tag] = directory_name
-        update.message.reply_markdown_v2(f"Mapped `{tag}` to `{directory_name}`.")
+        update.message.reply_markdown_v2(f"Mapped `{tag}` to `{directory_name}`")
 
     def _save_from_photo(self, update: Update, context: CallbackContext) -> None:
         if update.message.caption is None:
@@ -129,7 +137,7 @@ class Spike:
             return
 
         if len(parts) != 2 or parts[0] != "/save":
-            update.message.reply_markdown_v2("Usage: `/save TAG`.")
+            update.message.reply_markdown_v2("Usage: `/save TAG`")
             return
         
         tag = parts[1]
@@ -142,13 +150,13 @@ class Spike:
         elif message.reply_to_message is not None and len(message.reply_to_message.photo) > 0:
             src_message = message.reply_to_message
         else:
-            message.reply_text("You must reply to a message with a photo to save it.")
+            message.reply_markdown_v2("You must reply to a message with a photo to save it")
             return
 
         args = context.args
 
         if len(args) != 1:
-            message.reply_text("You must provide exactly one tag.")
+            message.reply_markdown_v2("You must provide exactly one tag")
             return
 
         tag = args[0]
