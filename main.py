@@ -165,7 +165,7 @@ class Spike:
         update.message.reply_markdown_v2(f"Mapped `{tag}` to `{directory_name}`")
 
     def _save_from_photo(self, update: Update, context: CallbackContext) -> None:
-        if (media_group_id := update.message.media_group_id) is not None and (tags := self._get_media_group_tags(media_group_id)):
+        if (media_group_id := update.message.media_group_id) is not None and (tags := self._get_media_group_tags(context, media_group_id)):
             for tag in tags:
                 self._save_photo_for_tag(update, context, update.message, tag)
             return
@@ -184,7 +184,7 @@ class Spike:
         tag = parts[1]
         if update.message.media_group_id is not None:
             self._add_tag_to_media_group(context, update.message.media_group_id, tag)
-            self._save_photo_for_tag(update, context, src_message, tag)
+            self._save_photo_for_tag(update, context, update.message, tag)
         else:
             self._save_photo_for_tag(update, context, update.message, tag)
 
