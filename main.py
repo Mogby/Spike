@@ -1,10 +1,11 @@
 import argparse
 import json
 import logging
+from os import wait
 from pathlib import Path
-from typing import Any, BinaryIO, Dict, List, Optional, Union
+from typing import Any, BinaryIO, Dict, List, Optional, Set, Union
 
-from telegram import Update, Message, PhotoSize
+from telegram import File, Update, Message, PhotoSize
 from telegram.ext import (
     CallbackContext,
     CommandHandler,
@@ -110,11 +111,46 @@ class Spike:
         else:
             update.message.reply_markdown_v2(f"[Saved]({public_url})", disable_web_page_preview=True)
 
+    def _add_message_to_media_group(self, context: CallbackContext, media_group_id: str, message: Message) -> None:
+        if "files_by_media_group_id" not in context.chat_data:
+            context.chat_data["files_by_media_group_id"] = dict()
+        media_group_files = context.chat_data["files_by_media_group_id"]
+        if media_group_id not in media_group_files:
+            media_group_files[media_group_id] = []
+        media_group_files[media_group_id].append(message)
+
+    def _get_media_group_messages(self, context: CallbackContext, media_group_id: str) -> List[Message]:
+        if "files_by_media_group_id" not in context.chat_data:
+            context.chat_data["files_by_media_group_id"] = dict()
+        media_group_files = context.chat_data["files_by_media_group_id"]
+        if media_group_id not in media_group_files:
+            media_group_files[media_group_id] = []
+        return media_group_files[media_group_id]
+
+    def _add_tag_to_media_group(self, context: CallbackContext, media_group_id: str, tag: str) -> None:
+        if "tags_by_media_group_id" not in context.chat_data:
+            context.chat_data["tags_by_media_group_id"] = dict()
+        tags_by_media_group_id = context.chat_data["tags_by_media_group_id"]
+        if media_group_id not in tags_by_media_group_id:
+            tags_by_media_group_id[media_group_id] = set()
+        tags_by_media_group_id[media_group_id].add(tag)
+
+    def _get_media_group_tags(self, context: CallbackContext, media_group_id: str) -> Set[str]:
+        if "tags_by_media_group_id" not in context.chat_data:
+            context.chat_data["tags_by_media_group_id"] = dict()
+        tags_by_media_group_id = context.chat_data["tags_by_media_group_id"]
+        if media_group_id not in tags_by_media_group_id:
+            tags_by_media_group_id[media_group_id] = set()
+        return tags_by_media_group_id[media_group_id]
+    
     def _log_message(self, update: Update, context: CallbackContext) -> None:
         logging.info("Got update:")
         logging.info(update)
         logging.info("Args:")
         logging.info(args := context.args)
+
+        if (media_group_id := update.message.media_group_id) is not None and update.message.photo:
+            self._add_message_to_media_group(context, media_group_id, update.message)
 
     def _map(self, update: Update, context: CallbackContext) -> None:
         args = context.args
@@ -129,6 +165,11 @@ class Spike:
         update.message.reply_markdown_v2(f"Mapped `{tag}` to `{directory_name}`")
 
     def _save_from_photo(self, update: Update, context: CallbackContext) -> None:
+        if (media_group_id := update.message.media_group_id) is not None and (tags := self._get_media_group_tags(media_group_id)):
+            for tag in tags:
+                self._save_photo_for_tag(update, context, update.message, tag)
+            return
+
         if update.message.caption is None:
             return
 
@@ -141,7 +182,11 @@ class Spike:
             return
         
         tag = parts[1]
-        self._save_photo_for_tag(update, context, update.message, tag)
+        if update.message.media_group_id is not None:
+            self._add_tag_to_media_group(context, update.message.media_group_id, tag)
+            self._save_photo_for_tag(update, context, src_message, tag)
+        else:
+            self._save_photo_for_tag(update, context, update.message, tag)
 
     def _save_from_reply(self, update: Update, context: CallbackContext) -> None:
         message = update.message
@@ -160,7 +205,13 @@ class Spike:
             return
 
         tag = args[0]
-        self._save_photo_for_tag(update, context, src_message, tag)
+
+        if (media_group_id := src_message.media_group_id) is not None:
+            self._add_tag_to_media_group(context, media_group_id, tag)
+            for message in self._get_media_group_messages(context, media_group_id):
+                self._save_photo_for_tag(update, context, message, tag)
+        else:
+            self._save_photo_for_tag(update, context, src_message, tag)
 
 
 def main():
