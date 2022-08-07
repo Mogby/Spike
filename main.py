@@ -85,6 +85,7 @@ class Spike:
         category = context.chat_data[tag]
         photo = get_largest_size(src_message.photo)
         filename = (
+            str(src_message.chat_id) + "_" +
             str(src_message.message_id).zfill(ID_SIZE) + ".jpg"
         )
         local_path = self.workdir / filename
