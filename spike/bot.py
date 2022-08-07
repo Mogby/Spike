@@ -62,7 +62,7 @@ class Spike:
 
         with local_path.open("rb") as f:
             try:
-                public_url = self.disk.save_file(f, yadisk_path)
+                self.disk.save_file(f, yadisk_path)
             except PathExistsError:
                 logging.error(f"File already exists: '{yadisk_path}'")
                 update.message.reply_markdown_v2(
@@ -75,6 +75,7 @@ class Spike:
 
         logging.info("Done")
         update.message.reply_to_message
+        public_url = self.disk.get_path_link(yadisk_path)
         if public_url is None:
             update.message.reply_markdown_v2(f"Saved to `{yadisk_path}`")
         else:
