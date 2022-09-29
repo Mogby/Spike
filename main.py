@@ -1,8 +1,8 @@
 import argparse
 import json
-import logging
+import logging.config
 
-from spike.yadisk import YaDisk
+from spike.bot import Spike
 
 
 def main() -> None:
