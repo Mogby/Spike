@@ -67,6 +67,7 @@ class Spike:
             use_context=True,
             persistence=PicklePersistence(filename=self.workdir / config["database"]),
         )
+        self.reply_delete_timeout_seconds = config.get("reply_delete_timeout_seconds")
         dispatcher = self.updater.dispatcher
         dispatcher.add_handler(MessageHandler(Filters.all, self._log_message), group=0)
         dispatcher.add_handler(
@@ -78,12 +79,19 @@ class Spike:
     def run(self) -> None:
         self.updater.start_polling()
 
+    def schedule_deletion(self, message: Message) -> None:
+        if self.reply_delete_timeout_seconds is None:
+            return
+        def callback(_: CallbackContext) -> None:
+            message.delete()
+        self.updater.job_queue.run_once(callback, self.reply_delete_timeout_seconds)
+
     def _save_photo_for_tag(
         self, update: Update, context: CallbackContext, src_message: Message, tag: str
     ) -> None:
         chat_data = context.chat_data
         if tag not in chat_data:
-            src_message.reply_markdown_v2(f"Unknown tag: `{tag}`")
+            self.schedule_deletion(src_message.reply_markdown_v2(f"Unknown tag: `{tag}`"))
             return
 
         category = context.chat_data[tag]
@@ -104,9 +112,9 @@ class Spike:
                 public_url = self.disk.save_file(f, yadisk_path)
             except yadisk.exceptions.PathExistsError:
                 logging.error(f"File already exists: '{yadisk_path}'")
-                update.message.reply_markdown_v2(
+                self.schedule_deletion(update.message.reply_markdown_v2(
                     f"Could not save becase file already exists: `{yadisk_path}`"
-                )
+                ))
                 return
             finally:
                 logging.info(f"Deleting '{local_path}'")
@@ -114,11 +122,11 @@ class Spike:
 
         logging.info("Done")
         if public_url is None:
-            update.message.reply_markdown_v2(f"Saved to `{yadisk_path}`")
+            self.schedule_deletion(update.message.reply_markdown_v2(f"Saved to `{yadisk_path}`"))
         else:
-            update.message.reply_markdown_v2(
+            self.schedule_deletion(update.message.reply_markdown_v2(
                 f"[Saved]({public_url})", disable_web_page_preview=True
-            )
+            ))
 
     def _add_message_to_media_group(
         self, context: CallbackContext, media_group_id: str, message: Message
@@ -175,13 +183,13 @@ class Spike:
         args = context.args
 
         if len(args) < 2:
-            update.message.reply_markdown_v2("Usage: `/map TAG DIRECTORY_NAME`")
+            self.schedule_deletion(update.message.reply_markdown_v2("Usage: `/map TAG DIRECTORY_NAME`"))
             return
 
         tag = args[0]
         directory_name = " ".join(args[1:])
         context.chat_data[tag] = directory_name
-        update.message.reply_markdown_v2(f"Mapped `{tag}` to `{directory_name}`")
+        self.schedule_deletion(update.message.reply_markdown_v2(f"Mapped `{tag}` to `{directory_name}`"))
 
     def _save_from_photo(self, update: Update, context: CallbackContext) -> None:
         if (media_group_id := update.message.media_group_id) is not None and (
@@ -199,7 +207,7 @@ class Spike:
             return
 
         if len(parts) != 2 or parts[0] != "/save":
-            update.message.reply_markdown_v2("Usage: `/save TAG`")
+            self.schedule_deletion(update.message.reply_markdown_v2("Usage: `/save TAG`"))
             return
 
         tag = parts[1]
@@ -219,15 +227,15 @@ class Spike:
         ):
             src_message = message.reply_to_message
         else:
-            message.reply_markdown_v2(
+            self.schedule_deletion(message.reply_markdown_v2(
                 "You must reply to a message with a photo to save it"
-            )
+            ))
             return
 
         args = context.args
 
         if len(args) != 1:
-            message.reply_markdown_v2("You must provide exactly one tag")
+            self.schedule_deletion(message.reply_markdown_v2("You must provide exactly one tag"))
             return
 
         tag = args[0]
