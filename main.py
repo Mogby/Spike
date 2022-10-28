@@ -4,7 +4,6 @@ import logging
 from os import wait
 from pathlib import Path
 from typing import Any, BinaryIO, Dict, List, Optional, Set, Union
-import typing
 
 from telegram import File, Update, Message, PhotoSize
 from telegram.ext import (
@@ -305,7 +304,7 @@ class Spike:
         else:
             self._save_photo_for_tag(update, context, update.message, tag)
 
-    def _parse_tag(self, args: typing.List[str]) -> str:
+    def _parse_tag(self, args: List[str]) -> str:
 
         if len(args) != 1:
             self.schedule_deletion(
