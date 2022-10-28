@@ -34,16 +34,27 @@ class YaDisk:
         self.root_dir = Path(config["root_dir"])
         self.public_url = config.get("public_url")
 
-    def save_file(self, file: BinaryIO, path: str) -> Optional[str]:
+    def save_file(self, file: BinaryIO, path: str, overwrite: bool = False) -> Optional[str]:
         dst_path = self.root_dir / path
         self._mkdir_if_not_exists(dst_path.parent)
         logging.info(f"Uploading to '{path}'")
-        self.api.upload(path_or_file=file, dst_path=dst_path)
+        self.api.upload(path_or_file=file, dst_path=dst_path, overwrite=overwrite)
 
         if self.public_url is None:
             return
 
         return f"{self.public_url}/{path}"
+
+    def download_file(self, remote_path: str, local_path: str) -> None:
+        dst_path = self.root_dir / remote_path
+        logging.info(f"Downloading from '{remote_path}'")
+        self.api.download(src_path=str(dst_path), path_or_file=str(local_path))
+
+    def check_exists(self, remote_path: str) -> bool:
+        dst_path = self.root_dir / remote_path
+        logging.info(f"Check exists for '{remote_path}'")
+        return self.api.exists(path=str(dst_path))
+        
 
     def _mkdir_if_not_exists(self, dir: AnyPath) -> None:
         if not self.api.exists(str(dir)):
@@ -118,6 +129,62 @@ class Spike:
         with local_path.open("rb") as f:
             try:
                 public_url = self.disk.save_file(f, yadisk_path)
+            except yadisk.exceptions.PathExistsError:
+                logging.error(f"File already exists: '{yadisk_path}'")
+                self.schedule_deletion(
+                    update.message.reply_markdown_v2(
+                        f"Could not save becase file already exists: `{yadisk_path}`"
+                    )
+                )
+                return
+            finally:
+                logging.info(f"Deleting '{local_path}'")
+                local_path.unlink()
+
+        logging.info("Done")
+        if public_url is None:
+            self.schedule_deletion(
+                update.message.reply_markdown_v2(f"Saved to `{yadisk_path}`")
+            )
+        else:
+            self.schedule_deletion(
+                update.message.reply_markdown_v2(
+                    f"[Saved]({public_url})", disable_web_page_preview=True
+                )
+            )
+
+    def _save_text_for_tag(
+        self, update: Update, context: CallbackContext, src_message: Message, tag: str
+    ) -> None:
+        chat_data = context.chat_data
+        if tag not in chat_data:
+            self.schedule_deletion(
+                src_message.reply_markdown_v2(f"Unknown tag: `{tag}`")
+            )
+            return
+
+        category = context.chat_data[tag]
+        text = src_message.text
+        filename = (
+            str(tag) + "_logs.txt"
+        )
+        
+        local_path = self.workdir / filename
+        yadisk_path = f"{category}/{filename}"
+
+        if self.disk.check_exists(yadisk_path):
+            logging.info(f"Downloading to '{local_path}'")
+            self.disk.download_file(yadisk_path, local_path)
+
+            with local_path.open("a") as f:
+                f.write(f"***\n{text}\n")
+        else:
+            with local_path.open("w") as f:
+                f.write(f"***\n{text}\n")
+
+        with local_path.open("rb") as f:
+            try:
+                public_url = self.disk.save_file(f, yadisk_path, overwrite=True)
             except yadisk.exceptions.PathExistsError:
                 logging.error(f"File already exists: '{yadisk_path}'")
                 self.schedule_deletion(
@@ -237,6 +304,18 @@ class Spike:
         else:
             self._save_photo_for_tag(update, context, update.message, tag)
 
+    def _parse_tag(self, args: List[str]) -> str:
+
+        if len(args) != 1:
+            self.schedule_deletion(
+                message.reply_markdown_v2("You must provide exactly one tag")
+            )
+            return
+
+        tag = args[0]
+
+        return tag
+
     def _save_from_reply(self, update: Update, context: CallbackContext) -> None:
         message = update.message
         if len(message.photo) > 0:
@@ -246,23 +325,21 @@ class Spike:
             and len(message.reply_to_message.photo) > 0
         ):
             src_message = message.reply_to_message
+        elif (
+            message.reply_to_message is not None
+        ):
+            tag = self._parse_tag(context.args)
+            self._save_text_for_tag(update, context, message.reply_to_message, tag)
+            return
         else:
             self.schedule_deletion(
                 message.reply_markdown_v2(
-                    "You must reply to a message with a photo to save it"
+                    "You must reply to a message with a photo or with text to save it"
                 )
             )
-            return
+            
 
-        args = context.args
-
-        if len(args) != 1:
-            self.schedule_deletion(
-                message.reply_markdown_v2("You must provide exactly one tag")
-            )
-            return
-
-        tag = args[0]
+        tag = self._parse_tag(context.args)
 
         if (media_group_id := src_message.media_group_id) is not None:
             self._add_tag_to_media_group(context, media_group_id, tag)
