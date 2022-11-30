@@ -54,11 +54,36 @@ class YaDisk:
         dst_path = self.root_dir / remote_path
         logging.info(f"Check exists for '{remote_path}'")
         return self.api.exists(path=str(dst_path))
-        
 
     def _mkdir_if_not_exists(self, dir: AnyPath) -> None:
         if not self.api.exists(str(dir)):
             self.api.mkdir(str(dir))
+
+
+class YaDiskBasedSettings:
+    def __init__(self, ya_disk_connection: YaDisk, settings_path: str = "mappings.json"):
+        self.ya_disk = ya_disk_connection
+        self.settings_path = Path(settings_path)
+
+    def save(self, settings_dict):
+        with open(self.settings_path, "w") as f:
+            f.write(json.dumps(settings_dict))
+        with open(self.settings_path, "rb") as f:
+            self.ya_disk.save_file(f, self.settings_path, overwrite=True)
+
+    def _load_local(self) -> Dict[str, Any]:
+        with open(self.settings_path, "r") as f:
+            return json.load(f)
+
+    def load(self) -> Dict[str, Any]:
+        if self.settings_path.exists():
+            return self._load_local()
+
+        if self.ya_disk.check_exists(self.settings_path):
+            self.ya_disk.download_file(self.settings_path, self.settings_path)
+            return self._load_local()
+
+        return {}
 
 
 def get_largest_size(sizes: List[PhotoSize]) -> PhotoSize:
@@ -71,6 +96,8 @@ def get_largest_size(sizes: List[PhotoSize]) -> PhotoSize:
 class Spike:
     def __init__(self, config: Dict[Any, Any]) -> None:
         self.disk = YaDisk(config["yadisk"])
+        self.mappings = None
+
         self.workdir = Path(config["workdir"])
         self.workdir.mkdir(exist_ok=True)
         self.updater = Updater(
@@ -271,7 +298,16 @@ class Spike:
 
         tag = args[0]
         directory_name = " ".join(args[1:])
+
+        if self.mappings is None:
+            self.mappings = YaDiskBasedSettings(self.disk)
+            for tag, dir_name in self.mappings.load().items():
+                context.chat_data[tag] = dir_name
+
         context.chat_data[tag] = directory_name
+
+        self.mappings.save(context.chat_data)
+
         self.schedule_deletion(
             update.message.reply_markdown_v2(f"Mapped `{tag}` to `{directory_name}`")
         )
